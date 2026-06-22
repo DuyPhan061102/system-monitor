@@ -17,9 +17,16 @@
                 <h1 class="text-3xl font-bold text-blue-400">System Dashboard</h1>
                 <p id="status-text" class="text-yellow-400 text-sm mt-1">Đang chờ kết nối...</p>
             </div>
-            <button id="connect-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold transition">
-                Kết nối Server
-            </button>
+            
+            <div class="flex gap-3 items-center">
+                <input type="text" id="server-ip" 
+                       class="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 font-mono text-sm w-64" 
+                       placeholder="Nhập IP Server (vd: 192.168.1.15)" 
+                       value="localhost">
+                <button id="connect-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold transition whitespace-nowrap">
+                    Kết nối Server
+                </button>
+            </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -242,7 +249,11 @@
             statusText.className = "text-yellow-400 text-sm mt-1";
             
             // Thay URL nếu Server chạy trên máy khác (VD: ws://192.168.1.x:8000/ws/monitor)
-            ws = new WebSocket("ws://localhost:8000/ws/monitor");
+            // Lấy địa chỉ IP người dùng gõ từ ô Input, nếu trống thì mặc định là localhost
+            const ipAddress = document.getElementById('server-ip').value.trim() || 'localhost';
+            
+            // Tự động ghép IP vào chuỗi kết nối WebSocket
+            ws = new WebSocket(`ws://${ipAddress}:8000/ws/monitor`);
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
