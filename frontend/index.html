@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-6">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">System Dashboard</h1>
+                <p id="status-text" class="text-yellow-400 text-sm mt-1">Đang chờ kết nối...</p>
+            </div>
+            <button id="connect-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold transition">
+                Kết nối Server
+            </button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="lg:col-span-1 space-y-6">
+                
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-300">Tài nguyên hệ thống</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>CPU</span> <span id="cpu-val">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="cpu-bar" class="bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>RAM</span> <span id="ram-val">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="ram-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Disk</span> <span id="disk-val">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="disk-bar" class="bg-purple-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-300">Top Tiến trình (RAM)</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 rounded-tl-lg">PID</th>
+                                    <th class="px-4 py-2">Tên</th>
+                                    <th class="px-4 py-2">RAM(MB)</th>
+                                    <th class="px-4 py-2 rounded-tr-lg">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="process-table">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-300">Remote Terminal</h2>
+                    
+                    <div id="terminal-output" class="bg-black rounded-lg p-3 font-mono text-xs text-green-400 h-64 overflow-y-auto mb-4 border border-gray-600 break-words">
+                        Welcome to System Shell...<br>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <input type="text" id="cmd-input" 
+                               class="flex-1 bg-gray-700 text-white font-mono text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-green-500" 
+                               placeholder="Nhập lệnh (vd: ping 8.8.8.8)..." 
+                               onkeypress="if(event.key === 'Enter') sendCommand()">
+                        <button onclick="sendCommand()" class="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold transition">
+                            Run
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-2">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-full">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-300">Live Screen</h2>
+                    <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-gray-600 flex items-center justify-center">
+                        <span id="canvas-placeholder" class="text-gray-500">No Signal</span>
+                        <canvas id="screen-canvas" tabindex="0" class="absolute inset-0 w-full h-full object-contain hidden focus:outline-none focus:ring-2 focus:ring-blue-500"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const btnConnect = document.getElementById('connect-btn');
+        const statusText = document.getElementById('status-text');
+        const canvas = document.getElementById('screen-canvas');
+        const ctx = canvas.getContext('2d');
+        const placeholder = document.getElementById('canvas-placeholder');
+
+        function updateBar(id, value) {
+            document.getElementById(`${id}-val`).innerText = `${value}%`;
+            document.getElementById(`${id}-bar`).style.width = `${value}%`;
+        }
+
+        function renderProcesses(processes) {
+            const tbody = document.getElementById('process-table');
+            tbody.innerHTML = processes.map(p => `
+                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-4 py-2 text-gray-400">${p.pid}</td>
+                    <td class="px-4 py-2 text-gray-200 truncate max-w-[120px]" title="${p.name}">${p.name}</td>
+                    <td class="px-4 py-2 font-mono text-yellow-300">${p.memory}</td>
+                    <td class="px-2 py-2">
+                        <button onclick="killProcess(${p.pid}, '${p.name}')" 
+                                class="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-1 rounded transition">
+                            KILL
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Hàm gửi lệnh qua WebSocket khi bấm nút KILL
+        function killProcess(pid, name) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Lỗi: Chưa kết nối với Server!");
+                return;
+            }
+            
+            // Hỏi xác nhận trước khi thực thi lệnh nguy hiểm
+            const confirmKill = confirm(`CẢNH BÁO: Bạn có chắc chắn muốn buộc dừng ứng dụng [${name}] (PID: ${pid}) không?`);
+            if (confirmKill) {
+                // Đóng gói JSON và gửi lệnh xuống Backend
+                const payload = {
+                    "action": "kill_process",
+                    "pid": pid
+                };
+                ws.send(JSON.stringify(payload));
+            }
+        }
+        // Hàm gửi lệnh Terminal
+        function sendCommand() {
+            const input = document.getElementById('cmd-input');
+            const cmd = input.value.trim();
+            
+            if (!cmd) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Lỗi: Chưa kết nối với Server!");
+                return;
+            }
+            
+            const termOut = document.getElementById('terminal-output');
+            // In lệnh mình vừa gõ lên màn hình bằng màu vàng để dễ phân biệt
+            termOut.innerHTML += `<div class="text-yellow-400 mt-2">> ${cmd}</div>`;
+            termOut.scrollTop = termOut.scrollHeight; // Tự động cuộn xuống đáy
+            
+            // Gửi qua WebSocket
+            ws.send(JSON.stringify({ "action": "terminal", "cmd": cmd }));
+            input.value = ''; // Xóa trắng ô nhập
+        }
+
+        function drawFrame(base64Str) {
+            placeholder.classList.add('hidden');
+            canvas.classList.remove('hidden');
+            
+            const img = new Image();
+            img.onload = () => {
+                // Đặt kích thước canvas khớp với kích thước thực tế của ảnh
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = "data:image/jpeg;base64," + base64Str;
+        }
+        // Bắt sự kiện click trên khung màn hình Live Screen
+        canvas.addEventListener('click', (event) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Lấy kích thước và vị trí của canvas trên trình duyệt
+            const rect = canvas.getBoundingClientRect();
+            
+            // Tính toán tọa độ Click tương đối bên trong canvas
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+            
+            // Quy đổi ra tỷ lệ phần trăm (0.0 đến 1.0)
+            const percentX = clickX / rect.width;
+            const percentY = clickY / rect.height;
+            
+            // Gửi tọa độ xuống Server
+            ws.send(JSON.stringify({
+                "action": "mouse_click",
+                "x": percentX,
+                "y": percentY
+            }));
+        });
+        // Bộ chuyển đổi tên phím từ JS sang chuẩn của thư viện PyAutoGUI
+        const keyMap = {
+            "Enter": "enter", "Backspace": "backspace", "Tab": "tab",
+            "ArrowUp": "up", "ArrowDown": "down", "ArrowLeft": "left", "ArrowRight": "right",
+            "Escape": "esc", "Delete": "delete", " ": "space"
+        };
+
+        // Bắt sự kiện gõ phím NGAY TRÊN KHUNG CANVAS
+        canvas.addEventListener('keydown', (event) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            
+            // Ngăn chặn trình duyệt cuộn trang khi bấm phím Space hoặc Phím điều hướng
+            event.preventDefault(); 
+            
+            // Lấy phím vừa gõ (chuyển đổi nếu là phím đặc biệt, giữ nguyên nếu là chữ cái)
+            let keyToSend = keyMap[event.key] || event.key.toLowerCase();
+            
+            // Gửi lệnh qua WebSockets
+            ws.send(JSON.stringify({
+                "action": "key_press",
+                "key": keyToSend
+            }));
+        });
+        btnConnect.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            statusText.innerText = "Đang chờ Host đồng ý...";
+            statusText.className = "text-yellow-400 text-sm mt-1";
+            
+            // Thay URL nếu Server chạy trên máy khác (VD: ws://192.168.1.x:8000/ws/monitor)
+            ws = new WebSocket("ws://localhost:8000/ws/monitor");
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === "error") {
+                    alert(data.message);
+                    statusText.innerText = "Bị từ chối truy cập";
+                    statusText.className = "text-red-400 text-sm mt-1";
+                    ws.close();
+                } 
+                else if (data.type === "success") {
+                    statusText.innerText = "Đã kết nối & Đang stream";
+                    statusText.className = "text-green-400 text-sm mt-1";
+                    btnConnect.innerText = "Ngắt kết nối";
+                    btnConnect.classList.replace('bg-blue-600', 'bg-red-600');
+                    btnConnect.classList.replace('hover:bg-blue-500', 'hover:bg-red-500');
+                }
+                
+                // ---> ĐÂY LÀ KHỐI LỆNH MỚI THÊM VÀO <---
+                // Chức năng: Lắng nghe phản hồi từ Server khi mình ra lệnh Kill Process
+                else if (data.type === "alert") {
+                    alert(data.msg); // Bật popup thông báo thành công/thất bại
+                }
+                // --------------------------------------
+                else if (data.type === "terminal_output") {
+                    const termOut = document.getElementById('terminal-output');
+                    // Format lại kết quả: đổi dấu xuống dòng thành thẻ <br> và giữ nguyên khoảng trắng
+                    const formatted = data.data.replace(/\n/g, "<br>").replace(/ /g, "&nbsp;");
+                    termOut.innerHTML += `<div class="text-green-400 opacity-90">${formatted}</div>`;
+                    termOut.scrollTop = termOut.scrollHeight;
+                }
+                // ---------------------------
+                else if (data.type === "data") {
+                    // Cập nhật tài nguyên
+                    updateBar('cpu', data.stats.cpu);
+                    updateBar('ram', data.stats.ram);
+                    updateBar('disk', data.stats.disk);
+                    // Cập nhật bảng process
+                    renderProcesses(data.stats.processes);
+                    // Render frame màn hình
+                    drawFrame(data.frame);
+                }
+            };
+
+            ws.onclose = () => {
+                btnConnect.innerText = "Kết nối Server";
+                btnConnect.classList.replace('bg-red-600', 'bg-blue-600');
+                btnConnect.classList.replace('hover:bg-red-500', 'hover:bg-blue-500');
+                statusText.innerText = "Đã ngắt kết nối";
+                statusText.className = "text-gray-400 text-sm mt-1";
+                
+                // Reset UI
+                updateBar('cpu', 0); updateBar('ram', 0); updateBar('disk', 0);
+                document.getElementById('process-table').innerHTML = '';
+                canvas.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+            };
+        });
+    </script>
+</body>
+</html>
