@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import base64
 import io
@@ -24,12 +25,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ---> THÊM KHỐI LỆNH NÀY VÀO <---
 @app.get("/")
 async def serve_frontend():
     """Khi truy cập vào IP gốc, tự động trả về giao diện Web"""
-    return FileResponse("frontend/index.html")
-# --------------------------------
+    # Thay vì gọi thẳng "frontend/index.html", ta nhờ hàm get_resource_path tìm giúp
+    file_path = get_resource_path("frontend/index.html")
+    return FileResponse(file_path)
 
 def ask_permission(client_ip: str) -> bool:
     """Hiển thị popup xin quyền trên máy Server (Host)"""
@@ -42,6 +43,16 @@ def ask_permission(client_ip: str) -> bool:
     )
     root.destroy()
     return result
+
+def get_resource_path(relative_path):
+    """Lấy đường dẫn tuyệt đối, tương thích với cả lúc chạy code thường và khi chạy file .exe"""
+    try:
+        # Khi chạy bằng file .exe, PyInstaller sẽ giấu đường dẫn ở biến sys._MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Khi chạy code bình thường bằng Terminal
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 def get_system_stats():
     """Lấy thông số CPU, RAM, Disk và danh sách Process"""

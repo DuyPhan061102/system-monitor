@@ -1,3 +1,6 @@
+import sys
+import uvicorn
+from backend.main import app as fastapi_app
 import tkinter as tk
 from tkinter import messagebox
 import socket
@@ -8,6 +11,11 @@ import os
 import time
 import webbrowser
 
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+    
 BROADCAST_PORT = 9999
 
 def get_local_ip():
@@ -29,12 +37,20 @@ def udp_broadcaster(pin, ip):
         s.sendto(msg.encode(), ('<broadcast>', BROADCAST_PORT))
         time.sleep(1)
 
+def get_resource_path(relative_path):
+    # Hàm này giống hệt hàm trong main.py, hãy copy nó vào app.py
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 def run_server():
     ip = get_local_ip()
     pin = str(random.randint(100000, 999999))
     
-    # Mở Backend chạy ngầm
-    subprocess.Popen(["python", "backend/main.py"], shell=True)
+    # Chạy trực tiếp FastAPI trong một luồng ngầm
+    threading.Thread(target=lambda: uvicorn.run(fastapi_app, host="0.0.0.0", port=8000), daemon=True).start()
     
     # Bật luồng phát sóng UDP
     threading.Thread(target=udp_broadcaster, args=(pin, ip), daemon=True).start()
