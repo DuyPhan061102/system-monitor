@@ -12,6 +12,7 @@ import os
 import subprocess
 import pyautogui
 import threading
+import ctypes
 
 app = FastAPI()
 
@@ -165,7 +166,29 @@ async def receive_commands(websocket: WebSocket):
                     # Lệnh đưa Windows vào chế độ Sleep
                     os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
                     await websocket.send_json({"type": "alert", "msg": "Đã gửi lệnh Ngủ (Sleep) xuống Server!"})
-                    
+            elif action == "take_screenshot":
+                # 1. Lấy IP của máy Client đang ra lệnh
+                client_ip = websocket.client.host
+                
+                # 2. Chụp ảnh màn hình chất lượng cao (PNG nguyên bản)
+                with mss.mss() as sct:
+                    monitor = sct.monitors[1]
+                    sct_img = sct.grab(monitor)
+                    img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+                    buffer = io.BytesIO()
+                    img.save(buffer, format="PNG") 
+                    b64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                
+                # 3. Gửi bức ảnh ngược về cho Client
+                await websocket.send_json({"type": "screenshot_result", "data": b64_img})
+                
+                # 4. Hiển thị thông báo trên máy Server (Chạy bằng Thread để không làm treo hệ thống)
+                def show_popup(ip):
+                    # 0x40 | 0x0 là cờ để hiện icon Information (Chữ i) và nút OK
+                    ctypes.windll.user32.MessageBoxW(0, f"Màn hình của bạn vừa được chụp lại bởi Client có IP: {ip}", "Thông Báo Quản Trị", 0x40 | 0x0)
+                
+                threading.Thread(target=show_popup, args=(client_ip,)).start()
+                        
     except WebSocketDisconnect:
         pass
 

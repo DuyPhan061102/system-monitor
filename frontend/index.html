@@ -35,10 +35,12 @@
             
                 <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex justify-between items-center">
                     <div>
-                        <h2 class="text-xl font-semibold text-gray-300">Power Control</h2>
-                        <p class="text-xs text-gray-500 mt-1">Điều khiển nguồn Server</p>
+                        <h2 class="text-xl font-semibold text-gray-300">Công cụ</h2>
                     </div>
                     <div class="flex gap-2">
+                        <button onclick="takeScreenshot()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold transition">
+                            📸 Chụp ảnh
+                        </button>
                         <button onclick="askPowerCommand('sleep')" class="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold transition">
                             💤 Sleep
                         </button>
@@ -229,6 +231,16 @@
             };
             img.src = "data:image/jpeg;base64," + base64Str;
         }
+
+        // Hàm gửi yêu cầu chụp màn hình
+        function takeScreenshot() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Lỗi: Chưa kết nối với Server!");
+                return;
+            }
+            ws.send(JSON.stringify({ "action": "take_screenshot" }));
+        }
+
         // Bắt sự kiện click trên khung màn hình Live Screen
         canvas.addEventListener('click', (event) => {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -313,6 +325,26 @@
                     alert(data.msg); // Bật popup thông báo thành công/thất bại
                 }
                 // --------------------------------------
+                else if (data.type === "alert") {
+                    alert(data.msg);
+                }
+                
+                // ---> THÊM NHÁNH NÀY ĐỂ NHẬN ẢNH VÀ TẢI XUỐNG 
+                else if (data.type === "screenshot_result") {
+                    // Tạo một thẻ link ảo <a> để ép trình duyệt tải file
+                    const link = document.createElement("a");
+                    link.href = "data:image/png;base64," + data.data;
+                    
+                    // Tạo tên file tự động dựa trên thời gian hiện tại
+                    const dateStr = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
+                    link.download = `Server_Screenshot_${dateStr}.png`;
+                    
+                    // Kích hoạt click tải xuống và dọn dẹp
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+                // -------------------------------------------------
                 else if (data.type === "terminal_output") {
                     const termOut = document.getElementById('terminal-output');
                     // Format lại kết quả: đổi dấu xuống dòng thành thẻ <br> và giữ nguyên khoảng trắng
