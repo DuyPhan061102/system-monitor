@@ -60,19 +60,26 @@ def get_system_stats():
     
     return {"cpu": cpu, "ram": ram, "disk": disk, "processes": processes}
 
-def get_screenshot_base64() -> str:
-    """Chụp màn hình, nén thành JPEG và chuyển sang Base64"""
+def get_screenshot_base64():
     with mss.mss() as sct:
-        monitor = sct.monitors[1] # Màn hình chính
+        # 1. Chụp màn hình chính
+        monitor = sct.monitors[1]
         sct_img = sct.grab(monitor)
         
-        # Chuyển đổi bytes raw sang ảnh JPEG để giảm băng thông
+        # 2. Chuyển dữ liệu thô sang đối tượng ảnh PIL
         img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-        buf = io.BytesIO()
-        # Quality=40 để stream mượt hơn, giảm độ trễ WebSockets
-        img.save(buf, format="JPEG", quality=40) 
         
-        return base64.b64encode(buf.getvalue()).decode('utf-8')
+        # 3. ÉP XUNG: Thu nhỏ kích thước ảnh đi 80% để truyền cho lẹ
+        new_width = int(img.width * 0.8)
+        new_height = int(img.height * 0.8)
+        img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
+        
+        # 4. Lưu ảnh dưới dạng JPEG với chất lượng nén còn 85%
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        
+        # 5. Mã hóa sang Base64 và gửi đi
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 async def send_system_data(websocket: WebSocket):
     """Luồng 1: Liên tục gửi thông số và màn hình cho Client"""
@@ -81,8 +88,12 @@ async def send_system_data(websocket: WebSocket):
             stats = get_system_stats()
             frame = await asyncio.to_thread(get_screenshot_base64)
             await websocket.send_json({"type": "data", "stats": stats, "frame": frame})
-            await asyncio.sleep(1) # Stream 1 FPS
-    except WebSocketDisconnect:
+            
+            # GIẢM ĐỘ TRỄ XUỐNG: 
+            # 0.05 giây/hình tương đương khoảng 20 FPS (Rất mượt)
+            await asyncio.sleep(0.05) 
+            
+    except Exception:
         pass # Client ngắt kết nối
 
 async def receive_commands(websocket: WebSocket):
