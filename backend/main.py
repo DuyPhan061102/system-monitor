@@ -11,7 +11,6 @@ from PIL import Image
 import os
 import subprocess
 import pyautogui
-import threading
 import ctypes
 
 app = FastAPI()
@@ -147,14 +146,11 @@ async def receive_commands(websocket: WebSocket):
                 # Quy đổi phần trăm ra tọa độ pixel thực tế
                 target_x = int(screen_w * percent_x)
                 target_y = int(screen_h * percent_y)
-
-                # Dùng thread để click nhằm tránh block luồng WebSockets
-                threading.Thread(target=pyautogui.click, args=(target_x, target_y)).start()
+                await asyncio.to_thread(pyautogui.click, target_x, target_y)
             elif action == "key_press":
                 key = data.get("key")
                 if key:
-                    # Dùng thread để không block luồng WebSockets
-                    threading.Thread(target=pyautogui.press, args=(key,)).start()
+                    await asyncio.to_thread(pyautogui.press, key)
             # Xử lý lệnh Nguồn (Power Control)
             elif action == "power":
                 cmd = data.get("cmd")
@@ -187,8 +183,8 @@ async def receive_commands(websocket: WebSocket):
                     # 0x40 | 0x0 là cờ để hiện icon Information (Chữ i) và nút OK
                     ctypes.windll.user32.MessageBoxW(0, f"Màn hình của bạn vừa được chụp lại bởi Client có IP: {ip}", "Thông Báo Quản Trị", 0x40 | 0x0)
                 
-                threading.Thread(target=show_popup, args=(client_ip,)).start()
-                        
+                asyncio.create_task(asyncio.to_thread(show_popup, client_ip))
+
     except WebSocketDisconnect:
         pass
 
