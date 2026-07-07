@@ -32,7 +32,21 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <div class="lg:col-span-1 space-y-6">
-                
+            
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-300">Power Control</h2>
+                        <p class="text-xs text-gray-500 mt-1">Điều khiển nguồn Server</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="askPowerCommand('sleep')" class="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold transition">
+                            💤 Sleep
+                        </button>
+                        <button onclick="askPowerCommand('shutdown')" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-semibold transition">
+                            🛑 Shutdown
+                        </button>
+                    </div>
+                </div>
                 <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
                     <h2 class="text-xl font-semibold mb-4 text-gray-300">Tài nguyên hệ thống</h2>
                     <div class="space-y-4">
@@ -160,6 +174,27 @@
                 ws.send(JSON.stringify(payload));
             }
         }
+
+        // Hàm xử lý khi bấm nút Nguồn
+        function askPowerCommand(type) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert("Lỗi: Chưa kết nối với Server!");
+                return;
+            }
+
+            // Đặt câu hỏi xác nhận tùy theo nút được bấm
+            let actionText = type === 'shutdown' ? 'TẮT MÁY (Shutdown)' : 'NGỦ (Sleep)';
+            let isConfirmed = confirm(`CẢNH BÁO: Bạn có chắc chắn muốn thực hiện lệnh [${actionText}] trên máy Server không?`);
+
+            if (isConfirmed) {
+                // Gửi lệnh xuống Backend
+                ws.send(JSON.stringify({
+                    "action": "power",
+                    "cmd": type
+                }));
+            }
+        }
+        // ----------------------------------
         // Hàm gửi lệnh Terminal
         function sendCommand() {
             const input = document.getElementById('cmd-input');

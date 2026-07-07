@@ -154,6 +154,17 @@ async def receive_commands(websocket: WebSocket):
                 if key:
                     # Dùng thread để không block luồng WebSockets
                     threading.Thread(target=pyautogui.press, args=(key,)).start()
+            # Xử lý lệnh Nguồn (Power Control)
+            elif action == "power":
+                cmd = data.get("cmd")
+                if cmd == "shutdown":
+                    # Lệnh tắt máy sau 5 giây (để OS kịp đóng các ứng dụng)
+                    os.system("shutdown /s /t 5 /c \"Hệ thống sẽ tắt theo lệnh từ Remote Client\"")
+                    await websocket.send_json({"type": "alert", "msg": "Đã gửi lệnh Tắt máy (Shutdown) xuống Server!"})
+                elif cmd == "sleep":
+                    # Lệnh đưa Windows vào chế độ Sleep
+                    os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+                    await websocket.send_json({"type": "alert", "msg": "Đã gửi lệnh Ngủ (Sleep) xuống Server!"})
                     
     except WebSocketDisconnect:
         pass
