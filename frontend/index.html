@@ -127,8 +127,17 @@
             </div>
         </div>
     </div>
-
-    <script>
+</div><script>
+        // Tự động điền IP và kết nối nếu có truyền tham số qua URL
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoIp = urlParams.get('ip');
+            if (autoIp) {
+                document.getElementById('server-ip').value = autoIp;
+                // Đợi 0.5s cho UI tải xong rồi tự động bấm nút Kết nối
+                setTimeout(() => document.getElementById('connect-btn').click(), 500);
+            }
+        };
         let ws = null;
         const btnConnect = document.getElementById('connect-btn');
         const statusText = document.getElementById('status-text');
@@ -325,9 +334,6 @@
                     alert(data.msg); // Bật popup thông báo thành công/thất bại
                 }
                 // --------------------------------------
-                else if (data.type === "alert") {
-                    alert(data.msg);
-                }
                 
                 // ---> THÊM NHÁNH NÀY ĐỂ NHẬN ẢNH VÀ TẢI XUỐNG 
                 else if (data.type === "screenshot_result") {

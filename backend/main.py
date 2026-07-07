@@ -4,6 +4,7 @@ import io
 import tkinter as tk
 from tkinter import messagebox
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import psutil
 import mss
@@ -23,6 +24,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ---> THÊM KHỐI LỆNH NÀY VÀO <---
+@app.get("/")
+async def serve_frontend():
+    """Khi truy cập vào IP gốc, tự động trả về giao diện Web"""
+    return FileResponse("frontend/index.html")
+# --------------------------------
 
 def ask_permission(client_ip: str) -> bool:
     """Hiển thị popup xin quyền trên máy Server (Host)"""
